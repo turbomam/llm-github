@@ -1,0 +1,54 @@
+site_name: llm-github
+repo_url: https://github.com/turbomam/llm-github
+site_url: https://turbomam.github.io/llm-github
+site_description: Tools for extracting knowledge from GitHub issues, PR comments, etc.
+site_author: Mark Andrew Miller
+edit_uri: edit/main/docs/
+repo_name: turbomam/llm-github
+copyright: Maintained by <a href="https://turbomam.com">Florian</a>.
+
+nav:
+  - Home: index.md
+  - Modules: modules.md
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+            setup_commands:
+                - import sys
+                - sys.path.append('../')
+theme:
+  name: material
+  feature:
+    tabs: true
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/turbomam/llm-github
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/llm-github
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true

@@ -1,0 +1,25 @@
+{
+  "template": "https://github.com/fpgmaas/cookiecutter-poetry.git",
+  "commit": "f448c9c6407c799f6b81b8e310608cb841e98d15",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "author": "Mark Andrew Miller",
+      "email": "mamillerpa@gmail.com",
+      "author_github_handle": "turbomam",
+      "project_name": "llm-github",
+      "project_slug": "llm_github",
+      "project_description": "Tools for extracting knowledge from GitHub issues, PR comments, etc.",
+      "include_github_actions": "y",
+      "publish_to": "pypi",
+      "deptry": "y",
+      "mkdocs": "y",
+      "codecov": "y",
+      "dockerfile": "y",
+      "devcontainer": "n",
+      "open_source_license": "MIT license",
+      "_template": "https://github.com/fpgmaas/cookiecutter-poetry.git"
+    }
+  },
+  "directory": null
+}
