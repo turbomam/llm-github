@@ -1,4 +1,4 @@
-from llm_github.foo import foo
+from llm_github.core import foo
 
 
 def test_foo():
