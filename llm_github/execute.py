@@ -1,8 +1,12 @@
 import os
 from typing import Dict, List, Optional
 
+from dotenv import load_dotenv
+from requests_cache import CachedSession
+from requests_cache.backends.sqlite import SQLiteCache
+
 # Fixing import conflicts by adjusting namespace and avoiding re-importing CachedSession
-from core import (
+from llm_github.core import (
     DEFAULT_DROPPED_FIELDS,
     EnvironmentVariableError,
     fetch_all_comments,
@@ -18,9 +22,6 @@ from core import (
     process_pull_requests,
     write_json_to_file,
 )
-from dotenv import load_dotenv
-from requests_cache import CachedSession
-from requests_cache.backends.sqlite import SQLiteCache
 
 # Load environment variables from .env file
 load_dotenv(dotenv_path="local/.env", verbose=True)

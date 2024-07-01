@@ -10,8 +10,11 @@ def test_return_verbatim():
 def test_get_rate_limit():
     mock_session = Mock()
     mock_session.get.return_value.status_code = 200
-    mock_session.get.return_value.json.return_value = {"rate": {"limit": 5000, "remaining": 4999}}
+    mock_session.get.return_value.json.return_value = {
+        "rate": {"limit": 5000, "remaining": 4999, "reset": 1234567890, "used": 1}
+    }
 
     token = "fake_token"  # noqa: S105
     result = get_rate_limit(token, mock_session)
-    assert result == {"limit": 5000, "remaining": 4999}
+    expected = {"limit": 5000, "remaining": 4999, "reset": 1234567890, "used": 1}
+    assert result["rate"] == expected
