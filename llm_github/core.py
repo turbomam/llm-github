@@ -1,11 +1,9 @@
 import json
-import os
 import time
 from typing import Dict, List, Optional
 
 import requests
-from dotenv import load_dotenv
-from requests_cache import CachedSession, SQLiteCache
+from requests_cache import CachedSession
 
 REQUESTS_TIMEOUT = 10  # Timeout in seconds for requests
 
@@ -41,23 +39,12 @@ class EnvironmentVariableError(Exception):
         super().__init__(f"{variable} {message}")
 
 
-# Load environment variables from .env file
-load_dotenv(dotenv_path="../local/.env", verbose=True)
-
-# Global access token for GitHub API
-global_token = os.getenv("GITHUB_TOKEN")
-if not global_token:
-    raise EnvironmentVariableError("GITHUB_TOKEN")
-print("Token loaded successfully.")
-
-# Set up cache with SQLite backend
-session = CachedSession(
-    cache_name="llm-github-cache",
-    backend=SQLiteCache("llm-github.sqlite", timeout=86400),  # Cache expires after 24 hours
-)
+def return_verbatim(input_string: str) -> str:
+    """Return the input string."""
+    return input_string
 
 
-def get_rate_limit(token: str) -> Dict[str, int]:
+def get_rate_limit(token: str, session: CachedSession) -> Dict[str, int]:
     """Fetch current rate limit status from GitHub API."""
     headers = {"Authorization": f"token {token}"}
     response = session.get("https://api.github.com/rate_limit", headers=headers, timeout=REQUESTS_TIMEOUT)
@@ -97,7 +84,7 @@ def handle_response_errors(response: requests.Response) -> None:
     print("Error message:", response.text)
 
 
-def github_token_check(token: str) -> Optional[Dict]:
+def github_token_check(token: str, session: CachedSession) -> Optional[Dict]:
     """Validate the GitHub token by fetching user profile."""
     headers = {"Authorization": f"token {token}"}
     response = session.get("https://api.github.com/user", headers=headers, timeout=REQUESTS_TIMEOUT)
@@ -108,9 +95,9 @@ def github_token_check(token: str) -> Optional[Dict]:
     return None
 
 
-def list_user_orgs(token: str) -> Optional[List[Dict]]:
+def list_user_orgs(token: str, session: CachedSession) -> Optional[List[Dict]]:
     """List all organizations the user is a member of."""
-    rate_limit = get_rate_limit(token)
+    rate_limit = get_rate_limit(token, session)
     if rate_limit["remaining"] == 0:
         wait_for_rate_limit_reset(rate_limit["reset"])
     headers = {"Authorization": f"token {token}"}
@@ -122,9 +109,9 @@ def list_user_orgs(token: str) -> Optional[List[Dict]]:
     return None
 
 
-def get_repos(org: str, token: str) -> Optional[List[Dict]]:
+def get_repos(org: str, token: str, session: CachedSession) -> Optional[List[Dict]]:
     """Fetch all repositories for a given organization."""
-    rate_limit = get_rate_limit(token)
+    rate_limit = get_rate_limit(token, session)
     if rate_limit["remaining"] == 0:
         wait_for_rate_limit_reset(rate_limit["reset"])
     repos = []
@@ -141,10 +128,10 @@ def get_repos(org: str, token: str) -> Optional[List[Dict]]:
     return repos
 
 
-def fetch_issues(org: str, token: str) -> Optional[List[Dict]]:
+def fetch_issues(org: str, token: str, session: CachedSession) -> Optional[List[Dict]]:
     """Fetch all issues from all repositories in an organization, handling pagination and rate limits."""
     issues = []
-    repos = get_repos(org, token)
+    repos = get_repos(org, token, session)
     if not repos:
         print("No repositories found or failed to fetch repositories.")
         return None
@@ -153,7 +140,7 @@ def fetch_issues(org: str, token: str) -> Optional[List[Dict]]:
         # Ensure the URL is constructed to fetch all issues (not just open ones)
         url = repo["issues_url"].replace("{/number}", "?state=all")
         while url:
-            rate_limit = get_rate_limit(token)  # Check rate limit before each request
+            rate_limit = get_rate_limit(token, session)  # Check rate limit before each request
             if rate_limit["remaining"] == 0:
                 wait_for_rate_limit_reset(rate_limit["reset"])
 
@@ -201,10 +188,10 @@ def process_issues(issues: List[Dict], keys_to_remove: List[str]) -> List[Dict]:
     return processed_issues
 
 
-def fetch_pull_requests(org: str, token: str) -> Optional[List[Dict]]:
+def fetch_pull_requests(org: str, token: str, session: CachedSession) -> Optional[List[Dict]]:
     """Fetch all pull requests from all repositories in an organization, handling pagination and rate limits."""
     pull_requests = []
-    repos = get_repos(org, token)
+    repos = get_repos(org, token, session)
     if not repos:
         print("No repositories found or failed to fetch repositories.")
         return None
@@ -212,7 +199,7 @@ def fetch_pull_requests(org: str, token: str) -> Optional[List[Dict]]:
     for repo in repos:
         url = f"{repo['url']}/pulls?state=all"
         while url:
-            rate_limit = get_rate_limit(token)  # Check rate limit before each request
+            rate_limit = get_rate_limit(token, session)  # Check rate limit before each request
             if rate_limit["remaining"] == 0:
                 wait_for_rate_limit_reset(rate_limit["reset"])
 
@@ -239,18 +226,20 @@ def process_pull_requests(pull_requests: List[Dict], keys_to_remove: List[str]) 
     return processed_pull_requests
 
 
-def fetch_all_comments(org: str, token: str) -> Optional[List[Dict]]:
-    """Fetch all comments from all repositories in an organization, distinguishing between issue and PR comments, while handling pagination and rate limits."""
+def fetch_all_comments(org: str, token: str, session: CachedSession) -> Optional[List[Dict]]:
+    """Fetch all comments from all repositories in an organization,
+    distinguishing between issue and PR comments, while handling pagination and rate limits."""
     all_comments = []
-    repos = get_repos(org, token)
+    repos = get_repos(org, token, session)
     if not repos:
         print("No repositories found or failed to fetch repositories.")
         return None
 
     for repo in repos:
-        url = f"{repo['url']}/issues/comments?per_page=100"  # Adjusting per_page to fetch more comments per request if needed
+        # Adjusting per_page to fetch more comments per request if needed
+        url = f"{repo['url']}/issues/comments?per_page=100"
         while url:
-            rate_limit = get_rate_limit(token)  # Check rate limit before each request
+            rate_limit = get_rate_limit(token, session)  # Check rate limit before each request
             if rate_limit["remaining"] == 0:
                 wait_for_rate_limit_reset(rate_limit["reset"])
 
@@ -283,10 +272,10 @@ def process_comments(comments: List[Dict], keys_to_remove: List[str]) -> List[Di
     return processed_comments
 
 
-def fetch_all_discussions(org: str, token: str) -> Optional[List[Dict]]:
+def fetch_all_discussions(org: str, token: str, session: CachedSession) -> Optional[List[Dict]]:
     """Fetch discussions from all repositories in the specified organization."""
     all_discussions = []
-    repos = get_repos(org, token)
+    repos = get_repos(org, token, session)
     if repos:
         for repo in repos:
             repo_name = repo["name"] if isinstance(repo, dict) else repo
@@ -350,44 +339,3 @@ def process_discussions(discussions: List[Dict], keys_to_remove: List[str]) -> L
         final_discussion = remove_keys_from_dict(cleaned_discussion, keys_to_remove)
         processed_discussions.append(final_discussion)
     return processed_discussions
-
-
-# Example usage and other utility functions could follow
-# Example usage
-user_data = github_token_check(global_token)
-orgs = list_user_orgs(global_token)
-
-# turbomam: Resource not found. This could be due to incorrect organization name or insufficient access permissions.
-# Error message: {"message":"Not Found","documentation_url":"https://docs.github.com/rest/repos/repos#list-organization-repositories","status":"404"}
-
-# microbiomedata: Access forbidden. Check if your token has the required scopes or if there's a rate limit issue.
-# Error message: {"message":"`microbiomedata` forbids access via a personal access token (classic). Please use a GitHub App, OAuth App, or a personal access token with fine-grained permissions.","documentation_url":"https://docs.github.com/rest/repos/repos#list-organization-repositories","status":"403"}
-
-# works: berkeleybop
-
-org_name = "microbiomedata"
-
-print("FETCHING REPOS")
-repos = get_repos(org_name, global_token)
-write_json_to_file(repos, f"{org_name}_repos.json")
-
-print("FETCHING ISSUES")
-org_issues = fetch_issues(org_name, global_token)
-sanitized_issues = process_issues(org_issues, DEFAULT_DROPPED_FIELDS)
-write_json_to_file(sanitized_issues, f"{org_name}_issues.json")
-
-print("FETCHING PRs")
-pull_requests = fetch_pull_requests(org_name, global_token)
-processed_pull_requests = process_pull_requests(pull_requests, DEFAULT_DROPPED_FIELDS)
-write_json_to_file(processed_pull_requests, f"{org_name}_prs.json")
-
-print("FETCHING COMMENTS")
-comments = fetch_all_comments(org_name, global_token)
-processed_comments = process_comments(comments, DEFAULT_DROPPED_FIELDS)
-write_json_to_file(processed_comments, f"{org_name}_comments.json")
-
-print("FETCHING DISCUSSIONS")
-all_discussions = fetch_all_discussions(org_name, global_token)
-processed_discussions = process_discussions(all_discussions, DEFAULT_DROPPED_FIELDS)
-print(f"Total discussions fetched from all repositories: {len(processed_discussions)}")
-write_json_to_file(processed_discussions, f"{org_name}_discussions.json")
