@@ -9,7 +9,7 @@ from typing_extensions import TypedDict  # Use from typing_extensions for compat
 REQUESTS_TIMEOUT = 10  # Timeout in seconds for requests
 
 # Default fields to be dropped from responses
-DEFAULT_DROPPED_FIELDS: List[str] = [
+DEFAULT_DROPPED_FIELDS = [
     "_links",
     "base",
     "comments_url",
@@ -35,8 +35,8 @@ class EnvironmentVariableError(Exception):
     """Exception raised for errors in the environment variables."""
 
     def __init__(self, variable: str, message: str = "is not set in the environment.") -> None:
-        self.variable: str = variable
-        self.message: str = message
+        self.variable = variable
+        self.message = message
         super().__init__(f"{variable} {message}")
 
 
@@ -47,17 +47,9 @@ class RateLimit(TypedDict):
     used: int
 
 
-class RateLimitResources(TypedDict):
-    core: RateLimit
-    graphql: RateLimit
-    # Add other resources as needed
-
-
 class RateLimitResponse(TypedDict):
     rate: RateLimit
-    resources: RateLimitResources
-    remaining: int
-    reset: int
+    resources: Dict[str, RateLimit]
 
 
 def return_verbatim(input_string: str) -> str:
@@ -70,8 +62,8 @@ def get_rate_limit(token: str, session: CachedSession) -> RateLimitResponse:
     headers = {"Authorization": f"token {token}"}
     response = session.get("https://api.github.com/rate_limit", headers=headers, timeout=REQUESTS_TIMEOUT)
     response.raise_for_status()  # Raises HTTPError for bad requests
-    rate_limit_response: RateLimitResponse = response.json()
-    return rate_limit_response
+    data: RateLimitResponse = response.json()
+    return data
 
 
 def wait_for_rate_limit_reset(reset_time: int) -> None:
@@ -112,23 +104,23 @@ def github_token_check(token: str, session: CachedSession) -> Optional[Dict[str,
     response = session.get("https://api.github.com/user", headers=headers, timeout=REQUESTS_TIMEOUT)
     if response.status_code == 200:
         print("Token is valid. User data retrieved successfully.")
-        user_data: Dict[str, Any] = response.json()
-        return user_data
-    handle_response_errors(response)
+        data: Dict[str, Any] = response.json()
+        return data
+    print(f"Failed to authenticate. Status code: {response.status_code}")
     return None
 
 
 def list_user_orgs(token: str, session: CachedSession) -> Optional[List[Dict[str, Any]]]:
     """List all organizations the user is a member of."""
     rate_limit = get_rate_limit(token, session)
-    if rate_limit["resources"]["core"]["remaining"] == 0:
-        wait_for_rate_limit_reset(rate_limit["resources"]["core"]["reset"])
+    if rate_limit["rate"]["remaining"] == 0:
+        wait_for_rate_limit_reset(rate_limit["rate"]["reset"])
     headers = {"Authorization": f"token {token}"}
     response = session.get("https://api.github.com/user/orgs", headers=headers, timeout=REQUESTS_TIMEOUT)
     if response.status_code == 200:
         print("Organizations retrieved successfully.")
-        orgs: List[Dict[str, Any]] = response.json()
-        return orgs
+        data: List[Dict[str, Any]] = response.json()
+        return data
     handle_response_errors(response)
     return None
 
@@ -136,8 +128,8 @@ def list_user_orgs(token: str, session: CachedSession) -> Optional[List[Dict[str
 def get_repos(org: str, token: str, session: CachedSession) -> Optional[List[Dict[str, Any]]]:
     """Fetch all repositories for a given organization."""
     rate_limit = get_rate_limit(token, session)
-    if rate_limit["resources"]["core"]["remaining"] == 0:
-        wait_for_rate_limit_reset(rate_limit["resources"]["core"]["reset"])
+    if rate_limit["rate"]["remaining"] == 0:
+        wait_for_rate_limit_reset(rate_limit["rate"]["reset"])
     repos: List[Dict[str, Any]] = []
     url = f"https://api.github.com/orgs/{org}/repos"
     headers = {"Authorization": f"token {token}"}
@@ -165,8 +157,8 @@ def fetch_issues(org: str, token: str, session: CachedSession) -> Optional[List[
         url = repo["issues_url"].replace("{/number}", "?state=all")
         while url:
             rate_limit = get_rate_limit(token, session)  # Check rate limit before each request
-            if rate_limit["resources"]["core"]["remaining"] == 0:
-                wait_for_rate_limit_reset(rate_limit["resources"]["core"]["reset"])
+            if rate_limit["rate"]["remaining"] == 0:
+                wait_for_rate_limit_reset(rate_limit["rate"]["reset"])
 
             response = session.get(url, headers={"Authorization": f"token {token}"}, timeout=REQUESTS_TIMEOUT)
             if response.status_code == 200:
@@ -180,7 +172,7 @@ def fetch_issues(org: str, token: str, session: CachedSession) -> Optional[List[
     return issues
 
 
-def sanitize_user_data(data: Any) -> Any:
+def sanitize_user_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """Recursively sanitize user data to keep only the user 'login'."""
     if isinstance(data, dict):
         if "login" in data and set(data.keys()) - {"login"}:
@@ -224,8 +216,8 @@ def fetch_pull_requests(org: str, token: str, session: CachedSession) -> Optiona
         url = f"{repo['url']}/pulls?state=all"
         while url:
             rate_limit = get_rate_limit(token, session)  # Check rate limit before each request
-            if rate_limit["resources"]["core"]["remaining"] == 0:
-                wait_for_rate_limit_reset(rate_limit["resources"]["core"]["reset"])
+            if rate_limit["rate"]["remaining"] == 0:
+                wait_for_rate_limit_reset(rate_limit["rate"]["reset"])
 
             response = session.get(url, headers={"Authorization": f"token {token}"}, timeout=REQUESTS_TIMEOUT)
             if response.status_code == 200:
@@ -251,7 +243,8 @@ def process_pull_requests(pull_requests: List[Dict[str, Any]], keys_to_remove: L
 
 
 def fetch_all_comments(org: str, token: str, session: CachedSession) -> Optional[List[Dict[str, Any]]]:
-    """Fetch all comments from all repositories in an organization, distinguishing between issue and PR comments, while handling pagination and rate limits."""
+    """Fetch all comments from all repositories in an organization,
+    distinguishing between issue and PR comments, while handling pagination and rate limits."""
     all_comments: List[Dict[str, Any]] = []
     repos = get_repos(org, token, session)
     if not repos:
@@ -263,8 +256,8 @@ def fetch_all_comments(org: str, token: str, session: CachedSession) -> Optional
         url = f"{repo['url']}/issues/comments?per_page=100"
         while url:
             rate_limit = get_rate_limit(token, session)  # Check rate limit before each request
-            if rate_limit["resources"]["core"]["remaining"] == 0:
-                wait_for_rate_limit_reset(rate_limit["resources"]["core"]["reset"])
+            if rate_limit["rate"]["remaining"] == 0:
+                wait_for_rate_limit_reset(rate_limit["rate"]["reset"])
 
             response = session.get(url, headers={"Authorization": f"token {token}"}, timeout=REQUESTS_TIMEOUT)
             if response.status_code == 200:
@@ -308,7 +301,7 @@ def fetch_all_discussions(org: str, token: str, session: CachedSession) -> Optio
                 all_discussions.extend(discussions)
             else:
                 print(f"No discussions found or an error occurred for repository: {repo_name}")
-    return all_discussions if all_discussions else None
+    return all_discussions
 
 
 def fetch_discussions_graphql(org: str, repo: str, token: str) -> Optional[List[Dict[str, Any]]]:
@@ -341,13 +334,16 @@ def fetch_discussions_graphql(org: str, repo: str, token: str) -> Optional[List[
     }
     """
     variables = {"org": org, "repo": repo}
+    # Added a timeout of 10 seconds
     response = requests.post(url, json={"query": query, "variables": variables}, headers=headers, timeout=10)
     if response.status_code == 200:
-        data = response.json()
+        data: Any = response.json()
         if "errors" in data:
             print(f"GraphQL Errors: {json.dumps(data['errors'], indent=2)}")
-        discussions = data.get("data", {}).get("repository", {}).get("discussions", {}).get("nodes", [])
-        return discussions if discussions is not None else []
+        nodes: Optional[List[Dict[str, Any]]] = (
+            data.get("data", {}).get("repository", {}).get("discussions", {}).get("nodes", [])
+        )
+        return nodes
     print(f"Failed to fetch discussions. Status code: {response.status_code}")
     print("Response: ", response.text)
     return None
