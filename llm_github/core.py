@@ -1,6 +1,6 @@
 import json
 import time
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 from requests_cache import CachedSession
@@ -8,7 +8,7 @@ from requests_cache import CachedSession
 REQUESTS_TIMEOUT = 10  # Timeout in seconds for requests
 
 # Default fields to be dropped from responses
-DEFAULT_DROPPED_FIELDS = [
+DEFAULT_DROPPED_FIELDS: List[str] = [
     "_links",
     "base",
     "comments_url",
@@ -33,7 +33,7 @@ DEFAULT_DROPPED_FIELDS = [
 class EnvironmentVariableError(Exception):
     """Exception raised for errors in the environment variables."""
 
-    def __init__(self, variable, message="is not set in the environment."):
+    def __init__(self, variable: str, message: str = "is not set in the environment.") -> None:
         self.variable = variable
         self.message = message
         super().__init__(f"{variable} {message}")
@@ -59,12 +59,12 @@ def wait_for_rate_limit_reset(reset_time: int) -> None:
     time.sleep(wait_time)
 
 
-def remove_keys_from_dict(data: Dict, keys_to_remove: List[str]) -> Dict:
+def remove_keys_from_dict(data: Dict[str, Any], keys_to_remove: List[str]) -> Dict[str, Any]:
     """Remove specified keys from a dictionary."""
     return {key: value for key, value in data.items() if key not in keys_to_remove}
 
 
-def write_json_to_file(json_object: List[Dict], filename: str) -> None:
+def write_json_to_file(json_object: List[Dict[str, Any]], filename: str) -> None:
     """Save data to a JSON file."""
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(json_object, f, ensure_ascii=False, indent=4)
@@ -84,7 +84,7 @@ def handle_response_errors(response: requests.Response) -> None:
     print("Error message:", response.text)
 
 
-def github_token_check(token: str, session: CachedSession) -> Optional[Dict]:
+def github_token_check(token: str, session: CachedSession) -> Optional[Dict[str, Any]]:
     """Validate the GitHub token by fetching user profile."""
     headers = {"Authorization": f"token {token}"}
     response = session.get("https://api.github.com/user", headers=headers, timeout=REQUESTS_TIMEOUT)
@@ -95,7 +95,7 @@ def github_token_check(token: str, session: CachedSession) -> Optional[Dict]:
     return None
 
 
-def list_user_orgs(token: str, session: CachedSession) -> Optional[List[Dict]]:
+def list_user_orgs(token: str, session: CachedSession) -> Optional[List[Dict[str, Any]]]:
     """List all organizations the user is a member of."""
     rate_limit = get_rate_limit(token, session)
     if rate_limit["remaining"] == 0:
@@ -109,12 +109,12 @@ def list_user_orgs(token: str, session: CachedSession) -> Optional[List[Dict]]:
     return None
 
 
-def get_repos(org: str, token: str, session: CachedSession) -> Optional[List[Dict]]:
+def get_repos(org: str, token: str, session: CachedSession) -> Optional[List[Dict[str, Any]]]:
     """Fetch all repositories for a given organization."""
     rate_limit = get_rate_limit(token, session)
     if rate_limit["remaining"] == 0:
         wait_for_rate_limit_reset(rate_limit["reset"])
-    repos = []
+    repos: List[Dict[str, Any]] = []
     url = f"https://api.github.com/orgs/{org}/repos"
     headers = {"Authorization": f"token {token}"}
     while url:
@@ -128,9 +128,9 @@ def get_repos(org: str, token: str, session: CachedSession) -> Optional[List[Dic
     return repos
 
 
-def fetch_issues(org: str, token: str, session: CachedSession) -> Optional[List[Dict]]:
+def fetch_issues(org: str, token: str, session: CachedSession) -> Optional[List[Dict[str, Any]]]:
     """Fetch all issues from all repositories in an organization, handling pagination and rate limits."""
-    issues = []
+    issues: List[Dict[str, Any]] = []
     repos = get_repos(org, token, session)
     if not repos:
         print("No repositories found or failed to fetch repositories.")
@@ -156,7 +156,7 @@ def fetch_issues(org: str, token: str, session: CachedSession) -> Optional[List[
     return issues
 
 
-def sanitize_user_data(data: Dict) -> Dict:
+def sanitize_user_data(data: Any) -> Any:
     """Recursively sanitize user data to keep only the user 'login'."""
     if isinstance(data, dict):
         if "login" in data and set(data.keys()) - {"login"}:
@@ -168,7 +168,7 @@ def sanitize_user_data(data: Dict) -> Dict:
     return data
 
 
-def remove_empty_values(data: Dict) -> Dict:
+def remove_empty_values(data: Any) -> Any:
     """Recursively remove keys with empty values from a dictionary or list."""
     if isinstance(data, dict):
         return {k: remove_empty_values(v) for k, v in data.items() if v or isinstance(v, bool)}
@@ -177,9 +177,9 @@ def remove_empty_values(data: Dict) -> Dict:
     return data
 
 
-def process_issues(issues: List[Dict], keys_to_remove: List[str]) -> List[Dict]:
+def process_issues(issues: List[Dict[str, Any]], keys_to_remove: List[str]) -> List[Dict[str, Any]]:
     """Process a list of issues to sanitize user information and remove empty values."""
-    processed_issues = []
+    processed_issues: List[Dict[str, Any]] = []
     for issue in issues:
         sanitized_issue = sanitize_user_data(issue)
         cleaned_issue = remove_empty_values(sanitized_issue)
@@ -188,9 +188,9 @@ def process_issues(issues: List[Dict], keys_to_remove: List[str]) -> List[Dict]:
     return processed_issues
 
 
-def fetch_pull_requests(org: str, token: str, session: CachedSession) -> Optional[List[Dict]]:
+def fetch_pull_requests(org: str, token: str, session: CachedSession) -> Optional[List[Dict[str, Any]]]:
     """Fetch all pull requests from all repositories in an organization, handling pagination and rate limits."""
-    pull_requests = []
+    pull_requests: List[Dict[str, Any]] = []
     repos = get_repos(org, token, session)
     if not repos:
         print("No repositories found or failed to fetch repositories.")
@@ -215,9 +215,9 @@ def fetch_pull_requests(org: str, token: str, session: CachedSession) -> Optiona
     return pull_requests
 
 
-def process_pull_requests(pull_requests: List[Dict], keys_to_remove: List[str]) -> List[Dict]:
+def process_pull_requests(pull_requests: List[Dict[str, Any]], keys_to_remove: List[str]) -> List[Dict[str, Any]]:
     """Process a list of pull requests to sanitize user information and remove empty values."""
-    processed_pull_requests = []
+    processed_pull_requests: List[Dict[str, Any]] = []
     for pr in pull_requests:
         sanitized_pr = sanitize_user_data(pr)
         cleaned_pr = remove_empty_values(sanitized_pr)
@@ -226,10 +226,10 @@ def process_pull_requests(pull_requests: List[Dict], keys_to_remove: List[str]) 
     return processed_pull_requests
 
 
-def fetch_all_comments(org: str, token: str, session: CachedSession) -> Optional[List[Dict]]:
+def fetch_all_comments(org: str, token: str, session: CachedSession) -> Optional[List[Dict[str, Any]]]:
     """Fetch all comments from all repositories in an organization,
     distinguishing between issue and PR comments, while handling pagination and rate limits."""
-    all_comments = []
+    all_comments: List[Dict[str, Any]] = []
     repos = get_repos(org, token, session)
     if not repos:
         print("No repositories found or failed to fetch repositories.")
@@ -261,9 +261,9 @@ def fetch_all_comments(org: str, token: str, session: CachedSession) -> Optional
     return all_comments
 
 
-def process_comments(comments: List[Dict], keys_to_remove: List[str]) -> List[Dict]:
+def process_comments(comments: List[Dict[str, Any]], keys_to_remove: List[str]) -> List[Dict[str, Any]]:
     """Process a list of comments to sanitize user information and remove empty values."""
-    processed_comments = []
+    processed_comments: List[Dict[str, Any]] = []
     for comment in comments:
         sanitized_comment = sanitize_user_data(comment)
         cleaned_comment = remove_empty_values(sanitized_comment)
@@ -272,9 +272,9 @@ def process_comments(comments: List[Dict], keys_to_remove: List[str]) -> List[Di
     return processed_comments
 
 
-def fetch_all_discussions(org: str, token: str, session: CachedSession) -> Optional[List[Dict]]:
+def fetch_all_discussions(org: str, token: str, session: CachedSession) -> Optional[List[Dict[str, Any]]]:
     """Fetch discussions from all repositories in the specified organization."""
-    all_discussions = []
+    all_discussions: List[Dict[str, Any]] = []
     repos = get_repos(org, token, session)
     if repos:
         for repo in repos:
@@ -288,7 +288,7 @@ def fetch_all_discussions(org: str, token: str, session: CachedSession) -> Optio
     return all_discussions
 
 
-def fetch_discussions_graphql(org: str, repo: str, token: str) -> Optional[List[Dict]]:
+def fetch_discussions_graphql(org: str, repo: str, token: str) -> Optional[List[Dict[str, Any]]]:
     """Fetch discussions using GitHub's GraphQL API."""
     url = "https://api.github.com/graphql"
     headers = {"Authorization": f"Bearer {token}"}
@@ -330,9 +330,9 @@ def fetch_discussions_graphql(org: str, repo: str, token: str) -> Optional[List[
     return None
 
 
-def process_discussions(discussions: List[Dict], keys_to_remove: List[str]) -> List[Dict]:
+def process_discussions(discussions: List[Dict[str, Any]], keys_to_remove: List[str]) -> List[Dict[str, Any]]:
     """Process a list of discussions to sanitize user information, remove empty values, and remove specified keys."""
-    processed_discussions = []
+    processed_discussions: List[Dict[str, Any]] = []
     for discussion in discussions:
         sanitized_discussion = sanitize_user_data(discussion)
         cleaned_discussion = remove_empty_values(sanitized_discussion)
