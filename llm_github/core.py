@@ -358,3 +358,9 @@ def process_discussions(discussions: List[Dict[str, Any]], keys_to_remove: List[
         final_discussion = remove_keys_from_dict(cleaned_discussion, keys_to_remove)
         processed_discussions.append(final_discussion)
     return processed_discussions
+
+
+def force_release() -> None:
+    """Force a release of the package to PyPI."""
+    # This function is used for demonstration purposes and should not be used in production
+    pass

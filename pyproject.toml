@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "llm_github"
-version = "0.0.1"
+version = "0.0.2"
 description = "Tools for extracting knowledge from GitHub issues, PR comments, etc."
 authors = ["Mark Andrew Miller <mamillerpa@gmail.com>"]
 repository = "https://github.com/turbomam/llm-github"
