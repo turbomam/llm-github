@@ -1,1 +1,1 @@
-::: llm_github.foo
+::: llm_github.core
